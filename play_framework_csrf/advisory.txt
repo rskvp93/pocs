@@ -1,0 +1,35 @@
+================= CSRF Protection Bypass =================================
+1. Introduction
+Play framework documentation: https://www.playframework.com/documentation/2.2.x/ScalaCsrf
+Play supports multiple methods for verifying that a request is not a CSRF request. 
+The primary mechanism is a CSRF token. This token gets placed either in the query string or body of every form submitted, 
+and also gets placed in the users session. Play then verifies that both tokens are present and match.
+To allow simple protection for non browser requests, such as requests made through AJAX, Play also supports the following:
+- If an X-Requested-With header is present, Play will consider the request safe. 
+  X-Requested-With is added to requests by many popular Javascript libraries, such as jQuery.
+- If a Csrf-Token header with value nocheck is present, or with a valid CSRF token, Play will consider the request safe.
+2. Vulnerability
+Weak protection (X-Requested-With and custom Csrf-Token) can be bypass with Flash + 307 redirect
+Technical: 
+It's possible to send the "X-Requested-With" header with Flash, 
+but we can't send it cross-domain due to the SOP implementation with Adobe's crossdomain.xml files. 
+However, we can trick Flash into sending the request anyway by issuing the request to a domain that does allow it, 
+which in turn sends a HTTP 307 redirect to the resource that we want to target. 
+Flash will send the request to the new resource before requesting crossdomain.xml on the new domain.
+- https://blog.whitehatsec.com/flash-307-redirect-game-over/ 
+- https://hackerone.com/reports/44146
+3. POC
+I created a POC test X-Requested-With on newest Chrome
+- victim.com:9000 (Play project with enable CSRF Protection)
+- attacker.com:8080 (Python Flask project: Flash + 307 redirect)
+Chrome requests http://attacker.com:8080/
+Chrome requests http://attacker.com:8080/TestCSRF.swf
+SWF requests http://attacker.com:8080/crossdomain.xml
+SWF requests http://attacker.com:8080/redirect307 (issues 307 redirect to post http://victim.com:9000/submit)
+SWF requests http://victim.com:9000/submit(including the X-Requested-With header and post data)
+SWF requests https://developer.vimeo.com/crossdomain.xml (404 not found but victim acttually pwned)
+
+
+-- Author----
+rskvp93@gmail.com
+Viettel Information Security Center.
